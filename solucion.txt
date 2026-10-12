@@ -1,0 +1,97 @@
+3. Actions y Reutilización
+💡 Punto de partida: ¿Instalarías Node.js a mano, paso a paso, cada vez que empiezas un proyecto, si alguien ya ha automatizado y probado ese proceso por ti? Las actions son justo eso: bloques de automatización ya hechos.
+
+💡 ¿Por qué me importa? Escribir todo con run funciona, pero es repetitivo y frágil (cada sistema operativo instala cosas de forma distinta). Las actions encapsulan esa complejidad y te permiten centrarte en la lógica de tu proyecto, no en el "cómo instalar X".
+
+🔗 Conexión con otros puntos: Usarás las actions de este punto en el pipeline de CI real (Punto 05) y en el propio despliegue (Punto 06).
+
+Objetivos de aprendizaje:
+
+Entender qué es una action y en qué se diferencia de un simple comando
+Localizar y evaluar actions en el GitHub Marketplace
+Conocer las actions oficiales más usadas: checkout, setup-*, cache
+Entender por qué versionar correctamente una action es una cuestión de seguridad y estabilidad
+3.1. ¿Qué es exactamente una "action"?
+Una action es una pieza de automatización reutilizable, empaquetada y publicada (normalmente en un repositorio de GitHub), que puedes invocar desde cualquier workflow con la clave uses.
+
+💡 Analogía de la librería de código: Así como en programación no reinventas una librería para parsear JSON, en GitHub Actions no reinventas cómo clonar un repositorio o instalar Python. Una action es como una función importada, pero para tu pipeline.
+
+📝 Dato técnico: Una action puede recibir parámetros de entrada mediante with:, igual que una función recibe argumentos.
+
+- name: Instalar Node.js 20
+  uses: actions/setup-node@v4
+  with:
+    node-version: '20'
+3.2. El GitHub Marketplace
+El GitHub Marketplace es el catálogo público de actions creadas por GitHub, por empresas (Docker, AWS, Slack...) y por la comunidad.
+
+💡 Antes de usar una action de terceros, comprueba:
+
+Número de estrellas y de repositorios que la usan
+Si el repositorio se mantiene activo (últimos commits recientes)
+Si su código es legible/auditable, ya que se ejecuta con acceso a tu repositorio
+⚠️ Error común: Instalar una action de un autor desconocido con muy pocas descargas para una tarea trivial que se podría hacer con dos líneas de run. Cada action añadida es una nueva dependencia y una nueva superficie de riesgo (lo veremos con detalle en el Punto 07).
+
+3.3. Actions oficiales imprescindibles
+3.3.1. actions/checkout
+Descarga el código del propio repositorio dentro del runner. Es, con diferencia, la action más usada: sin ella, el runner arranca con una máquina vacía que no conoce tu proyecto.
+
+- uses: actions/checkout@v4
+💡 Metáfora: checkout es como decirle al cocinero nuevo "aquí tienes la despensa completa del restaurante", antes de pedirle que cocine nada.
+
+3.3.2. actions/setup-node (y equivalentes)
+Instala una versión concreta de un lenguaje o runtime en el runner. Existen equivalentes para casi cualquier tecnología: setup-python, setup-java, setup-go, setup-dotnet...
+
+- uses: actions/setup-node@v4
+  with:
+    node-version: '20'
+    cache: 'npm'
+📝 Nota: Muchas de estas actions incluyen ya soporte de cache integrado (como se ve arriba), lo que simplifica no tener que configurar actions/cache por separado en los casos más comunes.
+
+3.3.3. actions/cache
+Guarda y restaura ficheros entre ejecuciones (típicamente dependencias como node_modules o la caché de un gestor de paquetes), para acelerar el pipeline.
+
+- uses: actions/cache@v4
+  with:
+    path: ~/.npm
+    key: npm-${{ hashFiles('package-lock.json') }}
+💡 Metáfora de la despensa reutilizada: Sin caché, cada ejecución vuelve a comprar todos los ingredientes desde cero, aunque sean los mismos que ayer. La caché es "recordar" la compra anterior si nada ha cambiado, ahorrando tiempo.
+
+⚠️ Error común: Usar una key de caché demasiado genérica que nunca cambia. Si las dependencias cambian pero la clave de caché sigue siendo la misma, el pipeline usará dependencias desactualizadas.
+
+3.4. Versionado de actions: por qué importa el @v4
+Toda action se referencia con un @ seguido de una versión, una rama o un commit concreto: actions/checkout@v4, actions/checkout@main, actions/checkout@a12b3c4....
+
+Forma de referenciar	Ejemplo	¿Es seguro?
+Tag de versión mayor	@v4	Recomendado para uso general
+Rama	@main	❌ Puede cambiar en cualquier momento sin aviso
+Commit SHA exacto	@a1b2c3d...	✅ Máxima seguridad, nada puede cambiar bajo ese hash
+⚠️ Riesgo de seguridad: Si referencias una action por rama (@main), el mantenedor podría cambiar el código de esa action en cualquier momento y tu workflow ejecutaría ese código nuevo sin que tú lo hayas revisado. Volveremos sobre esto en el Punto 07.
+
+3.5. Tipos de actions (para entender lo que usas)
+No necesitas crear actions propias en esta unidad, pero conviene saber que existen tres tipos, porque los verás en el código fuente de muchas actions del Marketplace:
+
+
+Loading
+📝 Nota: Una composite action es especialmente útil cuando tu organización repite siempre la misma secuencia de 4-5 steps en varios workflows: se agrupan en una sola action propia y se reutiliza con un único uses.
+
+3.6. Resumen del punto
+Concepto	Descripción
+Action	Pieza de automatización reutilizable invocada con uses
+Marketplace	Catálogo público de actions oficiales y de terceros
+actions/checkout	Descarga el código del repositorio en el runner
+actions/setup-*	Instala un lenguaje/runtime concreto
+actions/cache	Reutiliza ficheros entre ejecuciones para acelerar el pipeline
+Versionado (@v4 vs @main vs SHA)	Afecta directamente a la estabilidad y seguridad del workflow
+En el siguiente punto veremos cómo parametrizar estas actions y los propios workflows con variables, secretos y condicionales, para que un mismo pipeline se comporte de forma distinta según el contexto.
+
+Ejercicio Rápido: Cazando Actions en el Marketplace
+🎯 Escenario: Necesitas automatizar tres tareas para un proyecto Python con tests, sin escribir tú mismo la lógica de instalación.
+
+En papel/navegador (10 min):
+
+Busca en el Marketplace de GitHub una action oficial para instalar Python.
+Busca una action (oficial o muy popular) que permita comprobar el estilo de código con flake8 o similar.
+Para cada una, anota: nombre completo (autor/nombre), versión recomendada a fijar y qué parámetros (with:) admite según su documentación.
+Redacta en dos líneas por qué confiarías (o no) en cada una, basándote en los criterios vistos en el punto 3.2.
+💡 ¿Qué se busca? Practicar el criterio de evaluación de una action antes de usarla a ciegas, no solo copiar el primer resultado que aparezca.
